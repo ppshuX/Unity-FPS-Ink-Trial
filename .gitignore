@@ -1,0 +1,41 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+
+# Build outputs
+[Bb]uild/
+[Bb]uilds/
+
+# IDE settings
+.vs/
+.vscode/
+.idea/
+
+# Visual Studio / Rider generated files
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity package and archives
+*.unitypackage
+*.zip
+*.rar
+*.7z
+
+# Video files
+*.mp4
+*.mov
+*.avi
