@@ -14,6 +14,8 @@
 .vs/
 .vscode/
 .idea/
+.vsconfig/
+.vsconfig
 
 # Visual Studio / Rider generated files
 *.csproj
