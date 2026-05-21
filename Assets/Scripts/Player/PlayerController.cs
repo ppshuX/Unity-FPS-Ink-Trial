@@ -25,6 +25,8 @@ public class PlayerController : NetworkBehaviour
     private float eps = 0.01f;
     private Vector3 lastFramePosition = Vector3.zero;  // 记录上一帧的位置
     private Animator animator;
+    private Player player;
+    private Collider playerCollider;
 
     private float distToGround = 0f;
 
@@ -33,8 +35,19 @@ public class PlayerController : NetworkBehaviour
     {
         lastFramePosition = transform.position;
         animator = GetComponentInChildren<Animator>();
+        player = GetComponent<Player>();
+        playerCollider = GetComponent<Collider>();
 
-        distToGround = GetComponent<Collider>().bounds.extents.y;
+        if (rb != null)
+        {
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        }
+
+        if (playerCollider != null)
+        {
+            distToGround = playerCollider.bounds.extents.y;
+        }
     }
 
     public void Move(Vector3 _velocity)
@@ -61,6 +74,11 @@ public class PlayerController : NetworkBehaviour
 
     private void PerformMovement()
     {
+        if (rb == null)
+        {
+            return;
+        }
+
         if (velocity != Vector3.zero)
         {
             rb.MovePosition(rb.position + velocity * Time.fixedDeltaTime);
@@ -75,6 +93,11 @@ public class PlayerController : NetworkBehaviour
 
     private void PerformRotation()
     {
+        if (rb == null || cam == null)
+        {
+            return;
+        }
+
         if (recoilForce < 0.1)
         {
             recoilForce = 0f;
@@ -97,6 +120,11 @@ public class PlayerController : NetworkBehaviour
 
     private void PerformAnimation()
     {
+        if (animator == null)
+        {
+            return;
+        }
+
         Vector3 deltaPosition = transform.position - lastFramePosition;
         lastFramePosition = transform.position;
 
@@ -137,7 +165,7 @@ public class PlayerController : NetworkBehaviour
             direction = 8;
         }
 
-        if (GetComponent<Player>().IsDead())
+        if (player != null && player.IsDead())
         {
             direction = -1;
         }

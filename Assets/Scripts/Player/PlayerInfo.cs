@@ -13,6 +13,7 @@ public class PlayerInfo : MonoBehaviour
     private Transform infoUI;
 
     private Player player;
+    private Camera cachedCamera;
 
     private void Start()
     {
@@ -22,15 +23,34 @@ public class PlayerInfo : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        playerName.text = transform.name;
-        playerHealth.localScale = new Vector3(player.GetHealth() / 100f, 1f, 1f);
-
-        var camera = Camera.main;
-        if (camera == null)
+        if (player == null)
         {
             return;
         }
-        infoUI.transform.LookAt(infoUI.transform.position + camera.transform.rotation * Vector3.back, camera.transform.rotation * Vector3.up);
-        infoUI.Rotate(new Vector3(0f, 180f, 0f));
+
+        if (playerName != null)
+        {
+            playerName.text = transform.name;
+        }
+
+        if (playerHealth != null)
+        {
+            playerHealth.localScale = new Vector3((float)player.GetHealth() / Mathf.Max(1, player.GetMaxHealth()), 1f, 1f);
+        }
+
+        if (cachedCamera == null || !cachedCamera.isActiveAndEnabled)
+        {
+            cachedCamera = Camera.main;
+        }
+
+        if (cachedCamera == null)
+        {
+            return;
+        }
+        if (infoUI != null)
+        {
+            infoUI.transform.LookAt(infoUI.transform.position + cachedCamera.transform.rotation * Vector3.back, cachedCamera.transform.rotation * Vector3.up);
+            infoUI.Rotate(new Vector3(0f, 180f, 0f));
+        }
     }
 }

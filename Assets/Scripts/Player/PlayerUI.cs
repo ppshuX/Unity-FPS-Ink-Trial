@@ -21,6 +21,8 @@ public class PlayerUI : MonoBehaviour
     [SerializeField]
     private GameObject healthBarObject;
 
+    private float displayedHealthRatio = 1f;
+
 
     private void Awake()
     {
@@ -31,8 +33,14 @@ public class PlayerUI : MonoBehaviour
     {
         player = localPlayer;
         weaponManager = player.GetComponent<WeaponManager>();
-        bulletsObject.SetActive(true);
-        healthBarObject.SetActive(true);
+        if (bulletsObject != null)
+        {
+            bulletsObject.SetActive(true);
+        }
+        if (healthBarObject != null)
+        {
+            healthBarObject.SetActive(true);
+        }
     }
 
     // Update is called once per frame
@@ -40,16 +48,35 @@ public class PlayerUI : MonoBehaviour
     {
         if (player == null) return;
 
-        var currentWeapon = weaponManager.GetCurrentWeapon();
-        if (currentWeapon.isReloading)
+        if (weaponManager == null)
         {
-            bulletsText.text = "Reloading...";
-        }
-        else
-        {
-            bulletsText.text = "Bullets: " + currentWeapon.bullets + "/" + currentWeapon.maxBullets;
+            return;
         }
 
-        healthBarFill.localScale = new Vector3(player.GetHealth() / 100f, 1f, 1f);
+        var currentWeapon = weaponManager.GetCurrentWeapon();
+        if (currentWeapon == null)
+        {
+            return;
+        }
+
+        if (bulletsText != null && currentWeapon.isReloading)
+        {
+            bulletsText.text = currentWeapon.name + "  RELOADING";
+            bulletsText.color = new Color(1f, 0.82f, 0.38f);
+        }
+        else if (bulletsText != null)
+        {
+            bulletsText.text = currentWeapon.name + "  " + currentWeapon.bullets + "/" + currentWeapon.maxBullets;
+            bulletsText.color = currentWeapon.bullets <= Mathf.CeilToInt(currentWeapon.maxBullets * 0.25f)
+                ? new Color(1f, 0.45f, 0.38f)
+                : Color.white;
+        }
+
+        if (healthBarFill != null)
+        {
+            float targetHealthRatio = Mathf.Clamp01((float)player.GetHealth() / Mathf.Max(1, player.GetMaxHealth()));
+            displayedHealthRatio = Mathf.MoveTowards(displayedHealthRatio, targetHealthRatio, Time.deltaTime * 3.5f);
+            healthBarFill.localScale = new Vector3(displayedHealthRatio, 1f, 1f);
+        }
     }
 }

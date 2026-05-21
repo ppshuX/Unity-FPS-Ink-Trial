@@ -18,13 +18,18 @@ public class Player : NetworkBehaviour
 
     public void Setup()
     {
+        if (componentsToDisable == null)
+        {
+            componentsToDisable = new Behaviour[0];
+        }
+
         componentsEnabled = new bool[componentsToDisable.Length];
         for (int i = 0; i < componentsToDisable.Length; i ++ )
         {
             componentsEnabled[i] = componentsToDisable[i].enabled;
         }
         Collider col = GetComponent<Collider>();
-        colliderEnabled = col.enabled;
+        colliderEnabled = col != null && col.enabled;
 
         SetDefaults();
     }
@@ -36,7 +41,10 @@ public class Player : NetworkBehaviour
             componentsToDisable[i].enabled = componentsEnabled[i];
         }
         Collider col = GetComponent<Collider>();
-        col.enabled = colliderEnabled;
+        if (col != null)
+        {
+            col.enabled = colliderEnabled;
+        }
 
         if (IsServer)
         {
@@ -52,6 +60,7 @@ public class Player : NetworkBehaviour
 
     public void TakeDamage(int damage)  // 收到了伤害，只在服务器端被调用
     {
+        damage = Mathf.Max(0, damage);
         if (isDead.Value) return;
 
         currentHealth.Value -= damage;
@@ -71,15 +80,27 @@ public class Player : NetworkBehaviour
 
     private IEnumerator Respawn()  // 重生
     {
-        yield return new WaitForSeconds(GameManager.Singleton.MatchingSettings.respawnTime);
+        float respawnTime = GameManager.Singleton != null && GameManager.Singleton.MatchingSettings != null
+            ? GameManager.Singleton.MatchingSettings.respawnTime
+            : 3f;
+        yield return new WaitForSeconds(respawnTime);
 
         SetDefaults();
-        GetComponentInChildren<Animator>().SetInteger("direction", 0);
-        GetComponent<Rigidbody>().useGravity = true;
+        Animator animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            animator.SetInteger("direction", 0);
+        }
+
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.useGravity = true;
+        }
 
         if (IsLocalPlayer)
         {
-            transform.position = new Vector3(0f, 10f, 0f);
+            transform.position = TrialChallengeDirector.GetRecommendedRespawnPosition(new Vector3(0f, 10f, 0f));
         }
     }
 
@@ -96,17 +117,33 @@ public class Player : NetworkBehaviour
 
     private void Die()
     {
-        GetComponent<PlayerShooting>().StopShooting();
+        PlayerShooting shooting = GetComponent<PlayerShooting>();
+        if (shooting != null)
+        {
+            shooting.StopShooting();
+        }
 
-        GetComponentInChildren<Animator>().SetInteger("direction", -1);
-        GetComponent<Rigidbody>().useGravity = false;
+        Animator animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            animator.SetInteger("direction", -1);
+        }
+
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.useGravity = false;
+        }
 
         for (int i = 0; i < componentsToDisable.Length; i++)
         {
             componentsToDisable[i].enabled = false;
         }
         Collider col = GetComponent<Collider>();
-        col.enabled = false;
+        if (col != null)
+        {
+            col.enabled = false;
+        }
 
         StartCoroutine(Respawn());
     }
@@ -114,5 +151,20 @@ public class Player : NetworkBehaviour
     public int GetHealth()
     {
         return currentHealth.Value;
+    }
+
+    public void RestoreHealth(int amount)
+    {
+        if (!IsServer || isDead.Value)
+        {
+            return;
+        }
+
+        currentHealth.Value = Mathf.Min(maxHealth, currentHealth.Value + Mathf.Max(0, amount));
+    }
+
+    public int GetMaxHealth()
+    {
+        return maxHealth;
     }
 }

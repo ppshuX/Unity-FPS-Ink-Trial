@@ -23,7 +23,7 @@ public class GameManager : MonoBehaviour
     public void RegisterPlayer(string name, Player player)
     {
         player.transform.name = name;
-        players.Add(name, player);
+        players[name] = player;
     }
 
     public void UnRegisterPlayer(string name)
@@ -33,7 +33,9 @@ public class GameManager : MonoBehaviour
 
     public Player GetPlayer(string name)
     {
-        return players[name];
+        Player player;
+        players.TryGetValue(name, out player);
+        return player;
     }
 
     private void OnGUI()

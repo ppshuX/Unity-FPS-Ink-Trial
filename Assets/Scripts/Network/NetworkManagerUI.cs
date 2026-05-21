@@ -25,6 +25,7 @@ public class NetworkManagerUI : MonoBehaviour
     private Button refreshButton;
     [SerializeField]
     private Button buildButton;
+    private Button localTrialButton;
 
     [SerializeField]
     private Canvas menuUI;
@@ -45,6 +46,7 @@ public class NetworkManagerUI : MonoBehaviour
     private readonly List<Button> rooms = new List<Button>();
 
     private int buildRoomPortForRemoveApi = -1;
+    private bool menuClosed = false;
 
     private void Start()
     {
@@ -60,6 +62,14 @@ public class NetworkManagerUI : MonoBehaviour
         if (buildRoomPortForRemoveApi != -1)
         {
             RemoveRoom();
+        }
+    }
+
+    private void Update()
+    {
+        if (!menuClosed && menuUI != null && menuUI.gameObject.activeInHierarchy && Input.GetKeyDown(KeyCode.L))
+        {
+            StartLocalTrial();
         }
     }
 
@@ -199,6 +209,81 @@ public class NetworkManagerUI : MonoBehaviour
 
         if (buildButton != null)
             buildButton.onClick.AddListener(BuildRoom);
+
+        CreateLocalTrialButton();
+    }
+
+    private void CreateLocalTrialButton()
+    {
+        if (localTrialButton != null || buildButton == null)
+        {
+            return;
+        }
+
+        GameObject buttonObj = Instantiate(buildButton.gameObject, buildButton.transform.parent);
+        buttonObj.name = "Local Trial";
+
+        RectTransform rect = buttonObj.GetComponent<RectTransform>();
+        RectTransform sourceRect = buildButton.GetComponent<RectTransform>();
+        if (rect != null && sourceRect != null)
+        {
+            rect.anchorMin = sourceRect.anchorMin;
+            rect.anchorMax = sourceRect.anchorMax;
+            rect.pivot = sourceRect.pivot;
+            rect.sizeDelta = sourceRect.sizeDelta;
+            rect.anchoredPosition = sourceRect.anchoredPosition + new Vector2(0f, -62f);
+        }
+        else
+        {
+            buttonObj.transform.localPosition = buildButton.transform.localPosition + new Vector3(0f, -62f, 0f);
+        }
+
+        localTrialButton = buttonObj.GetComponent<Button>();
+        if (localTrialButton == null)
+        {
+            localTrialButton = buttonObj.AddComponent<Button>();
+        }
+
+        localTrialButton.onClick.RemoveAllListeners();
+        localTrialButton.onClick.AddListener(StartLocalTrial);
+
+        TextMeshProUGUI label = localTrialButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (label != null)
+        {
+            label.text = "LOCAL TRIAL";
+        }
+    }
+
+    private void StartLocalTrial()
+    {
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("NetworkManager.Singleton 为 null，无法启动单人试炼。");
+            return;
+        }
+
+        if (!NetworkManager.Singleton.IsListening)
+        {
+            var transport = GetComponent<UNetTransport>();
+            ConfigureUnetClientEndpoints(transport, "127.0.0.1", 7777);
+
+            if (!NetworkManager.Singleton.StartHost())
+            {
+                Debug.LogError("单人试炼 StartHost 失败。");
+                return;
+            }
+        }
+
+        DestroyAllButtons();
+        if (menuUI != null)
+        {
+            menuUI.gameObject.SetActive(false);
+        }
+
+        if (TrialHud.Singleton != null)
+        {
+            TrialHud.Singleton.ShowFeedback("LOCAL TRIAL");
+        }
     }
 
     private void RefreshRoomList()
@@ -215,6 +300,11 @@ public class NetworkManagerUI : MonoBehaviour
             if (uwr.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
             {
                 LogWebFailure("[RoomList]", uwr);
+                yield break;
+            }
+
+            if (menuClosed)
+            {
                 yield break;
             }
 
@@ -366,6 +456,8 @@ public class NetworkManagerUI : MonoBehaviour
 
     private void DestroyAllButtons()
     {
+        menuClosed = true;
+
         if (refreshButton != null)
         {
             refreshButton.onClick.RemoveAllListeners();
@@ -376,6 +468,12 @@ public class NetworkManagerUI : MonoBehaviour
         {
             buildButton.onClick.RemoveAllListeners();
             Destroy(buildButton.gameObject);
+        }
+
+        if (localTrialButton != null)
+        {
+            localTrialButton.onClick.RemoveAllListeners();
+            Destroy(localTrialButton.gameObject);
         }
 
         foreach (var room in rooms)

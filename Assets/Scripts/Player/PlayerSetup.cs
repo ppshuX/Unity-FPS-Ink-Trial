@@ -28,7 +28,13 @@ public class PlayerSetup : NetworkBehaviour
             DisableComponents();
         } else
         {
-            PlayerUI.Singleton.setPlayer(GetComponent<Player>());
+            if (PlayerUI.Singleton != null)
+            {
+                PlayerUI.Singleton.setPlayer(GetComponent<Player>());
+            }
+            FpsPolishController.AttachToLocalPlayer(gameObject);
+            TrialPlayerAbility.Attach(gameObject);
+            TrialChallengeDirector.SetLocalPlayer(GetComponent<Player>());
             SetLayerMaskForAllChildren(transform, LayerMask.NameToLayer("Player"));
             sceneCamera = menuWorldCamera;
             if (sceneCamera == null)
@@ -45,11 +51,17 @@ public class PlayerSetup : NetworkBehaviour
             }
         }
 
-        string name = "Player " + GetComponent<NetworkObject>().NetworkObjectId.ToString();
+        NetworkObject networkObject = GetComponent<NetworkObject>();
+        string name = networkObject != null
+            ? "Player " + networkObject.NetworkObjectId.ToString()
+            : "Player " + GetInstanceID().ToString();
         Player player = GetComponent<Player>();
         player.Setup();
 
-        GameManager.Singleton.RegisterPlayer(name, player);
+        if (GameManager.Singleton != null)
+        {
+            GameManager.Singleton.RegisterPlayer(name, player);
+        }
     }
 
     private void SetLayerMaskForAllChildren(Transform transform, LayerMask layerMask)
@@ -77,6 +89,9 @@ public class PlayerSetup : NetworkBehaviour
             sceneCamera.gameObject.SetActive(true);
         }
 
-        GameManager.Singleton.UnRegisterPlayer(transform.name);
+        if (GameManager.Singleton != null)
+        {
+            GameManager.Singleton.UnRegisterPlayer(transform.name);
+        }
     }
 }

@@ -21,11 +21,19 @@ public class WeaponManager : NetworkBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        EquipWeapon(primaryWeapon);
+        if (primaryWeapon != null)
+        {
+            EquipWeapon(primaryWeapon);
+        }
     }
 
     public void EquipWeapon(PlayerWeapon weapon)
     {
+        if (weapon == null || weapon.graphics == null || weaponHolder == null)
+        {
+            return;
+        }
+
         currentWeapon = weapon;
 
         if (weaponHolder.transform.childCount > 0)
@@ -33,13 +41,12 @@ public class WeaponManager : NetworkBehaviour
             Destroy(weaponHolder.transform.GetChild(0).gameObject);
         }
 
-        GameObject weaponObject = Instantiate(currentWeapon.graphics, weaponHolder.transform.position, weaponHolder.transform.rotation);
-        weaponObject.transform.SetParent(weaponHolder.transform);
+        GameObject weaponObject = Instantiate(currentWeapon.graphics, weaponHolder.transform);
 
         currentGraphics = weaponObject.GetComponent<WeaponGraphics>();
         currentAudiSource = weaponObject.GetComponent<AudioSource>();
 
-        if (IsLocalPlayer)
+        if (IsLocalPlayer && currentAudiSource != null)
         {
             currentAudiSource.spatialBlend = 0f;
         }
@@ -96,15 +103,40 @@ public class WeaponManager : NetworkBehaviour
             {
                 ToggleWeaponServerRpc();
             }
+            else if (Input.GetKeyDown(KeyCode.Alpha1) && currentWeapon != primaryWeapon)
+            {
+                ToggleWeaponServerRpc();
+            }
+            else if (Input.GetKeyDown(KeyCode.Alpha2) && currentWeapon != secondaryWeapon)
+            {
+                ToggleWeaponServerRpc();
+            }
         }
     }
 
     public void Reload(PlayerWeapon playerWeapon)
     {
-        if (playerWeapon.isReloading) return;
+        if (playerWeapon == null || playerWeapon.isReloading || playerWeapon.bullets >= playerWeapon.maxBullets) return;
         playerWeapon.isReloading = true;
 
         StartCoroutine(ReloadCoroutine(playerWeapon));
+    }
+
+    public void RefillAllAmmo()
+    {
+        RefillWeapon(primaryWeapon);
+        RefillWeapon(secondaryWeapon);
+    }
+
+    private void RefillWeapon(PlayerWeapon weapon)
+    {
+        if (weapon == null)
+        {
+            return;
+        }
+
+        weapon.bullets = weapon.maxBullets;
+        weapon.isReloading = false;
     }
 
     private IEnumerator ReloadCoroutine(PlayerWeapon playerWeapon)

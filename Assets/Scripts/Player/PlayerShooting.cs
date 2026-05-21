@@ -40,11 +40,29 @@ public class PlayerShooting : NetworkBehaviour
 
         if (!IsLocalPlayer) return;
 
+        if (TrialChallengeDirector.Singleton != null && TrialChallengeDirector.Singleton.IsPaused())
+        {
+            CancelInvoke("Shoot");
+            return;
+        }
+
+        if (weaponManager == null)
+        {
+            return;
+        }
+
         currentWeapon = weaponManager.GetCurrentWeapon();
 
+#if UNITY_EDITOR
         if (Input.GetKeyDown(KeyCode.K))
         {
             ShootServerRpc(transform.name, 10);
+        }
+#endif
+
+        if (currentWeapon == null)
+        {
+            return;
         }
 
         if (Input.GetKeyDown(KeyCode.R))
@@ -67,7 +85,7 @@ public class PlayerShooting : NetworkBehaviour
             {
                 autoShootCount = 0;
                 InvokeRepeating("Shoot", 0f, 1f / currentWeapon.shootRate);
-            } else if (Input.GetButtonUp("Fire1") || Input.GetKeyDown(KeyCode.Q))
+            } else if (Input.GetButtonUp("Fire1") || Input.GetKeyDown(KeyCode.Q) || currentWeapon.isReloading)
             {
                 CancelInvoke("Shoot");
             }
@@ -81,19 +99,38 @@ public class PlayerShooting : NetworkBehaviour
 
     private void OnHit(Vector3 pos, Vector3 normal, HitEffectMaterial material)  // 击中点的特效
     {
+        if (weaponManager == null)
+        {
+            return;
+        }
+
+        WeaponGraphics graphics = weaponManager.GetCurrentGraphics();
+        if (graphics == null)
+        {
+            return;
+        }
+
         GameObject hitEffectPrefab;
         if (material == HitEffectMaterial.Metal)
         {
-            hitEffectPrefab = weaponManager.GetCurrentGraphics().metalHitEffectPrefab;
+            hitEffectPrefab = graphics.metalHitEffectPrefab;
         } else
         {
-            hitEffectPrefab = weaponManager.GetCurrentGraphics().stoneHitEffectPrefab;
+            hitEffectPrefab = graphics.stoneHitEffectPrefab;
+        }
+
+        if (hitEffectPrefab == null)
+        {
+            return;
         }
 
         GameObject hitEffectObject = Instantiate(hitEffectPrefab, pos, Quaternion.LookRotation(normal));
         ParticleSystem particleSystem = hitEffectObject.GetComponent<ParticleSystem>();
-        particleSystem.Emit(1);
-        particleSystem.Play();
+        if (particleSystem != null)
+        {
+            particleSystem.Emit(1);
+            particleSystem.Play();
+        }
         Destroy(hitEffectObject, 1f);
     }
 
@@ -115,12 +152,29 @@ public class PlayerShooting : NetworkBehaviour
 
     private void OnShoot(float recoilForce)  // 每次射击相关的逻辑，包括特效、声音等
     {
-        weaponManager.GetCurrentGraphics().muzzleFlash.Play();
-        weaponManager.GetCurrentAudioSource().Play();
+        if (weaponManager == null)
+        {
+            return;
+        }
+
+        WeaponGraphics graphics = weaponManager.GetCurrentGraphics();
+        if (graphics != null && graphics.muzzleFlash != null)
+        {
+            graphics.muzzleFlash.Play();
+        }
+
+        AudioSource audioSource = weaponManager.GetCurrentAudioSource();
+        if (audioSource != null)
+        {
+            audioSource.Play();
+        }
 
         if (IsLocalPlayer)  // 施加后坐力
         {
-            playerController.AddRecoilForce(recoilForce);
+            if (playerController != null)
+            {
+                playerController.AddRecoilForce(recoilForce);
+            }
         }
     }
 
@@ -142,12 +196,27 @@ public class PlayerShooting : NetworkBehaviour
 
     private void Shoot()
     {
-        if (currentWeapon.bullets <= 0 || currentWeapon.isReloading) return;
-
-        currentWeapon.bullets--;
+        if (currentWeapon == null || currentWeapon.isReloading || cam == null)
+        {
+            return;
+        }
 
         if (currentWeapon.bullets <= 0)
         {
+            CancelInvoke("Shoot");
+            weaponManager.Reload(currentWeapon);
+            return;
+        }
+
+        currentWeapon.bullets--;
+        if (TrialChallengeDirector.Singleton != null)
+        {
+            TrialChallengeDirector.Singleton.RegisterShotFired();
+        }
+
+        if (currentWeapon.bullets <= 0)
+        {
+            CancelInvoke("Shoot");
             weaponManager.Reload(currentWeapon);
         }
 
@@ -161,24 +230,57 @@ public class PlayerShooting : NetworkBehaviour
 
         OnShootServerRpc(recoilForce);
 
+        Vector3 trailEnd = cam.transform.position + cam.transform.forward * currentWeapon.range;
         RaycastHit hit;
         if (Physics.Raycast(cam.transform.position, cam.transform.forward, out hit, currentWeapon.range, mask))
         {
-            if (hit.collider.tag == PLAYER_TAG)
+            trailEnd = hit.point;
+            TrialTarget target = hit.collider.GetComponentInParent<TrialTarget>();
+            if (target != null)
             {
-                ShootServerRpc(hit.collider.name, currentWeapon.damage);
+                if (TrialChallengeDirector.Singleton != null)
+                {
+                    TrialChallengeDirector.Singleton.RegisterTargetHit(target, currentWeapon.damage, hit.point);
+                }
                 OnHitServerRpc(hit.point, hit.normal, HitEffectMaterial.Metal);
-            } else
+            }
+            else
             {
-                OnHitServerRpc(hit.point, hit.normal, HitEffectMaterial.Stone);
+                TrialSpecter specter = hit.collider.GetComponentInParent<TrialSpecter>();
+                if (specter != null)
+                {
+                    if (TrialChallengeDirector.Singleton != null)
+                    {
+                        TrialChallengeDirector.Singleton.RegisterSpecterHit(specter, currentWeapon.damage);
+                    }
+                    OnHitServerRpc(hit.point, hit.normal, HitEffectMaterial.Metal);
+                }
+                else if (hit.collider.CompareTag(PLAYER_TAG))
+                {
+                    ShootServerRpc(hit.collider.name, currentWeapon.damage);
+                    OnHitServerRpc(hit.point, hit.normal, HitEffectMaterial.Metal);
+                } else
+                {
+                    OnHitServerRpc(hit.point, hit.normal, HitEffectMaterial.Stone);
+                }
             }
         }
+
+        TrialEffects.SpawnBulletTrail(cam.transform.position + cam.transform.forward * 0.7f, trailEnd, new Color(1f, 0.86f, 0.38f));
     }
 
     [ServerRpc]
     private void ShootServerRpc(string name, int damage)
     {
+        if (GameManager.Singleton == null)
+        {
+            return;
+        }
+
         Player player = GameManager.Singleton.GetPlayer(name);
-        player.TakeDamage(damage);
+        if (player != null)
+        {
+            player.TakeDamage(damage);
+        }
     }
 }
