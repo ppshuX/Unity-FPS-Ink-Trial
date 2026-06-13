@@ -13,6 +13,7 @@
 # IDE settings
 .vs/
 .vscode/
+!.vscode/extensions.json
 .idea/
 .vsconfig/
 .vsconfig
@@ -41,3 +42,21 @@
 *.mp4
 *.mov
 *.avi
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Node.js (if using Node-based tools)
+node_modules/
+npm-debug.log*
